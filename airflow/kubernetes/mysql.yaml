@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      io.kompose.service: mysql
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        io.kompose.service: mysql
+    spec:
+      restartPolicy: "Always"
+      containers:
+        - env:
+            - name: MYSQL_ROOT_PASSWORD
+              value: mysqlpassword
+            - name: MYSQL_DATABASE
+              value: airflow
+          image: mysql:latest
+          name: mysql-pod
+          ports:
+            - containerPort: 3306
+          imagePullPolicy: "Always"
+          resources:
+            requests:
+              memory: 1Gi
+              cpu: "0.25"
+            limits:
+              memory: 2Gi
+              cpu: "0.5"
+          volumeMounts:
+            - name: mysql-config-volume ## specify volume name
+              mountPath: /etc/mysql/conf.d/default_auth.cnf ## path to mount file
+              subPath: default_auth ## name of config
+      volumes:
+        - name: mysql-config-volume ## volume name
+          configMap:
+            name: mysql-config ## name of ConfigMa
+status: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql
+  labels:
+    io.kompose.service: mysql
+spec:
+  ports:
+    - name: "3306"
+      port: 3306
+      protocol: TCP
+      targetPort: 3306
+  selector:
+    io.kompose.service: mysql
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  ## name of ConfigMap. This will be referred from volume definition
+  name: mysql-config
+  labels:
+    io.kompose.service: mysql
+data:
+  ## default_auth is the name of config. This will be referred from volume mount definition
+  default_auth: |
+    [mysqld]
+    default_authentication_plugin= mysql_native_password

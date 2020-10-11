@@ -1,0 +1,142 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: airflow-webserver
+  labels:
+    io.kompose.service: webserver
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      io.kompose.service: webserver
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 50%
+  template:
+    metadata:
+      labels:
+        io.kompose.service: webserver
+    spec:
+      containers:
+        - name: webserver-pod
+          ports:
+            - containerPort: 8080
+          image: puckel/docker-airflow:1.10.9
+          resources:
+            requests:
+              memory: 1Gi
+              cpu: "0.25"
+            limits:
+              memory: 2Gi
+              cpu: "0.5"
+          imagePullPolicy: Always
+          command: ["/bin/sh", "-c"]
+          args:
+            - pip3.7 install apache-airflow[kubernetes] && airflow upgradedb && airflow webserver;
+          envFrom:
+            - configMapRef:
+                name: airflow-variables
+          env:
+            - name: AIRFLOW__KUBERNETES__ENV_FROM_CONFIGMAP_REF
+              value: airflow-variables
+          volumeMounts:
+            - name: requirements-configmap
+              subPath: "requirements.txt"
+              mountPath: "/requirements.txt"
+            - mountPath: /usr/local/airflow/dags
+              name: airflow-dags
+              readOnly: false
+            - mountPath: /usr/local/airflow/plugins
+              name: airflow-plugins
+              readOnly: false
+            - mountPath: /usr/local/airflow/airflow.cfg
+              name: airflow-cfgfile
+              subPath: airflow.cfg
+              readOnly: false
+        - name: git-sync-clone-dags
+          image: k8s.gcr.io/git-sync:v3.1.2
+          imagePullPolicy: IfNotPresent
+          resources:
+            requests:
+              memory: 800Mi
+              cpu: "0.25"
+            limits:
+              memory: 2Gi
+              cpu: "0.5"
+          envFrom:
+            - configMapRef:
+                name: airflow-gitsync-dags
+            - secretRef:
+                name: airflow-secrets
+          volumeMounts:
+            - mountPath: /git
+              name: airflow-dags
+        - name: git-sync-clone-plugins
+          image: k8s.gcr.io/git-sync:v3.1.2
+          imagePullPolicy: IfNotPresent
+          resources:
+            requests:
+              memory: 800Mi
+              cpu: "0.25"
+            limits:
+              memory: 2Gi
+              cpu: "0.5"
+          envFrom:
+            - configMapRef:
+                name: airflow-gitsync-plugins
+            - secretRef:
+                name: airflow-secrets
+          volumeMounts:
+            - mountPath: /git
+              name: airflow-plugins
+      volumes:
+        - name: requirements-configmap
+          configMap:
+            name: requirements-configmap
+        - configMap:
+            name: airflow-cfgfile
+          name: airflow-cfgfile
+        - configMap:
+            name: airflow-gitsync-dags
+          name: airflow-gitsync-dags
+        - configMap:
+            name: airflow-gitsync-plugins
+          name: airflow-gitsync-plugins
+        - emptyDir: {}
+          name: airflow-dags
+        - emptyDir: {}
+          name: airflow-plugins
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: airflow-webserver
+  labels:
+    io.kompose.service: webserver
+spec:
+  ports:
+    - name: "8080"
+      port: 8080
+      protocol: TCP
+      targetPort: 8080
+  selector:
+    io.kompose.service: webserver
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: airflow-webserver-web
+  labels:
+    io.kompose.service: webserver
+spec:
+  selector:
+    io.kompose.service: webserver
+  ports:
+    - name: http
+      protocol: TCP
+      port: 8080
+      targetPort: 8080
+  type: LoadBalancer
+  loadBalancerIP: 127.0.0.1

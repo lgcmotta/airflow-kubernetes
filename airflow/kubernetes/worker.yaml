@@ -1,0 +1,91 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: airflow-worker
+  labels:
+    io.kompose.service: worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      io.kompose.service: worker
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 50%
+  template:
+    metadata:
+      labels:
+        io.kompose.service: worker
+    spec:
+      containers:
+        - name: worker-pod
+          image: puckel/docker-airflow:1.10.9
+          resources:
+            requests:
+              memory: 1Gi
+              cpu: "0.25"
+            limits:
+              memory: 2Gi
+              cpu: "0.5"
+          imagePullPolicy: Always
+          command: ["/bin/sh", "-c"]
+          args:
+            - pip3.7 install apache-airflow[kubernetes] && airflow upgradedb && airflow worker;
+          envFrom:
+            - configMapRef:
+                name: airflow-variables
+          env:
+            - name: AIRFLOW__KUBERNETES__ENV_FROM_CONFIGMAP_REF
+              value: airflow-variables
+        - name: git-sync-clone-dags
+          image: k8s.gcr.io/git-sync:v3.1.2
+          imagePullPolicy: IfNotPresent
+          resources:
+            requests:
+              memory: 800Mi
+              cpu: "0.25"
+            limits:
+              memory: 2Gi
+              cpu: "0.5"
+          envFrom:
+            - configMapRef:
+                name: airflow-gitsync-dags
+            - secretRef:
+                name: airflow-secrets
+          volumeMounts:
+            - mountPath: /git
+              name: airflow-dags
+        - name: git-sync-clone-plugins
+          image: k8s.gcr.io/git-sync:v3.1.2
+          imagePullPolicy: IfNotPresent
+          resources:
+            requests:
+              memory: 800Mi
+              cpu: "0.25"
+            limits:
+              memory: 2Gi
+              cpu: "0.5"
+          envFrom:
+            - configMapRef:
+                name: airflow-gitsync-plugins
+            - secretRef:
+                name: airflow-secrets
+          volumeMounts:
+            - mountPath: /git
+              name: airflow-plugins
+      volumes:
+        - configMap:
+            name: airflow-cfgfile
+          name: airflow-cfgfile
+        - configMap:
+            name: airflow-gitsync-dags
+          name: airflow-gitsync-dags
+        - configMap:
+            name: airflow-gitsync-plugins
+          name: airflow-gitsync-plugins
+        - emptyDir: {}
+          name: airflow-dags
+        - emptyDir: {}
+          name: airflow-plugins
