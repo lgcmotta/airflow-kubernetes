@@ -1,37 +1,5 @@
 # airflow-kubernetes
 
-## Setup the environment
-
-First you have to generate your SSH key. The key type should be ED25519. Open a terminal window and type:
-
-```bash
-    ssh-keygen -t ed25519 -C "<comment>"
-```
-
-The `-C` flag, with a quoted comment such as an email address, is an optional way to label your SSH keys.
-
-Sample:
-
-```bash
-    ssh-keygen -t ed25519 -C "firstName.lastName@sequor.com.br"
-```
-
-You'll be prompeted to enter a file in which you can store your key. **But you should use the suggested file just pressing 'Enter'**
-
-Next, you'll be asked to set up your passphrase, **It is recomended to use a password, but you can just press 'Enter"**
-
-To test your ssh key, type in the terminal:
-
-```bash
-    ssh -T git@git.sequor.com.br
-```
-
-You'll be asked if you want to connect to gitlab. Type: 'yes' and hit 'Enter'.
-Then type your passphrase and press 'Enter' again.
-If everythig goes as expected you should be connected to gitlab.
-
-Gitlab SSH keys documentation is available [here](https://docs.gitlab.com/ee/ssh/).
-
 ## Kubernetes Local Cluster
 
 First of all, make sure that you have Docker installed in your machine, if you don't have Docker installed please head to Docker Desktop official page [here](https://www.docker.com/products/docker-desktop)
